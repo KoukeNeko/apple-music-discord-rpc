@@ -56,7 +56,8 @@ class Cache {
 const MACOS_VER = await getMacOSVersion();
 const IS_APPLE_MUSIC = MACOS_VER >= 10.15;
 const APP_NAME: iTunesAppName = IS_APPLE_MUSIC ? "Music" : "iTunes";
-const CLIENT_ID = IS_APPLE_MUSIC ? "773825528921849856" : "979297966739300416";
+// const CLIENT_ID = IS_APPLE_MUSIC ? "773825528921849856" : "979297966739300416"; 
+const CLIENT_ID = IS_APPLE_MUSIC ? "1053582647017885786" : "979297966739300416";
 const DEFAULT_TIMEOUT = 15e3;
 
 start();
@@ -240,13 +241,16 @@ async function setActivity(rpc: Client): Promise<number> {
   const state = await getState();
   console.log("state:", state);
 
+  const props = await getProps();
+  let end;
+
   switch (state) {
     case "playing": {
-      const props = await getProps();
+      
       console.log("props:", props);
 
       let delta;
-      let end;
+      
       if (props.duration) {
         delta = (props.duration - props.playerPosition) * 1000;
         end = Math.ceil(Date.now() + delta);
@@ -256,7 +260,7 @@ async function setActivity(rpc: Client): Promise<number> {
       const activity: Activity = {
         details: formatStr(props.name),
         timestamps: { end },
-        assets: { large_image: "appicon" },
+        assets: { large_image: "appicon"},
       };
 
       if (props.artist.length > 0) {
@@ -273,7 +277,10 @@ async function setActivity(rpc: Client): Promise<number> {
         activity.assets = {
           large_image: infos.artworkUrl ?? "appicon",
           large_text: formatStr(props.album),
+          small_image: "play_button512",
         };
+
+        // set Activity Type to Listening
 
         if (infos.iTunesUrl) {
           buttons.push({
@@ -300,7 +307,60 @@ async function setActivity(rpc: Client): Promise<number> {
       return Math.min((delta ?? DEFAULT_TIMEOUT) + 1000, DEFAULT_TIMEOUT);
     }
 
-    case "paused":
+    case "paused": {
+      const props = await getProps();
+            console.log("props:", props);
+      
+            let delta;
+      
+            // EVERYTHING must be less than or equal to 128 chars long
+            const activity: Activity = {
+              details: formatStr(props.name),
+              timestamps: { end },
+              assets: { large_image: "appicon"},
+            };
+      
+            if (props.artist.length > 0) {
+              activity.state = formatStr(`by ${props.artist}`);
+            }
+      
+            // album.length == 0 for radios
+            if (props.album.length > 0) {
+              const buttons = [];
+      
+              const infos = await getTrackExtras(props);
+              console.log("infos:", infos);
+      
+              activity.assets = {
+                large_image: infos.artworkUrl ?? "appicon",
+                large_text: formatStr(props.album),
+                small_image: "pause_button512",
+              };
+      
+              if (infos.iTunesUrl) {
+                buttons.push({
+                  label: "Play on Apple Music",
+                  url: infos.iTunesUrl,
+                });
+              }
+      
+              const query = encodeURIComponent(
+                `artist:${props.artist} track:${props.name}`
+              );
+              const spotifyUrl = `https://open.spotify.com/search/${query}?si`;
+              if (spotifyUrl.length <= 512) {
+                buttons.push({
+                  label: "Search on Spotify",
+                  url: spotifyUrl,
+                });
+              }
+      
+              if (buttons.length > 0) activity.buttons = buttons;
+            }
+      
+            await rpc.setActivity(activity);
+            return Math.min((delta ?? DEFAULT_TIMEOUT) + 1000, DEFAULT_TIMEOUT);
+    }
     case "stopped": {
       await rpc.clearActivity();
       return DEFAULT_TIMEOUT;
