@@ -2,7 +2,7 @@
 
 import type { Activity } from "https://deno.land/x/discord_rpc@0.3.2/mod.ts";
 import { Client } from "https://deno.land/x/discord_rpc@0.3.2/mod.ts";
-import type {} from "https://raw.githubusercontent.com/NextFire/jxa/v0.0.5/run/global.d.ts";
+import type { } from "https://raw.githubusercontent.com/NextFire/jxa/v0.0.5/run/global.d.ts";
 import { run } from "https://raw.githubusercontent.com/NextFire/jxa/v0.0.5/run/mod.ts";
 import type { iTunes } from "https://raw.githubusercontent.com/NextFire/jxa/v0.0.5/run/types/core.d.ts";
 
@@ -243,14 +243,13 @@ async function setActivity(rpc: Client): Promise<number> {
 
   const props = await getProps();
   let end;
+  console.log("props:", props);
+
+  let delta;
 
   switch (state) {
     case "playing": {
-      
-      console.log("props:", props);
 
-      let delta;
-      
       if (props.duration) {
         delta = (props.duration - props.playerPosition) * 1000;
         end = Math.ceil(Date.now() + delta);
@@ -260,7 +259,8 @@ async function setActivity(rpc: Client): Promise<number> {
       const activity: Activity = {
         details: formatStr(props.name),
         timestamps: { end },
-        assets: { large_image: "appicon"},
+        assets: { large_image: "appicon" },
+
       };
 
       if (props.artist.length > 0) {
@@ -308,58 +308,54 @@ async function setActivity(rpc: Client): Promise<number> {
     }
 
     case "paused": {
-      const props = await getProps();
-            console.log("props:", props);
-      
-            let delta;
-      
-            // EVERYTHING must be less than or equal to 128 chars long
-            const activity: Activity = {
-              details: formatStr(props.name),
-              timestamps: { end },
-              assets: { large_image: "appicon"},
-            };
-      
-            if (props.artist.length > 0) {
-              activity.state = formatStr(`by ${props.artist}`);
-            }
-      
-            // album.length == 0 for radios
-            if (props.album.length > 0) {
-              const buttons = [];
-      
-              const infos = await getTrackExtras(props);
-              console.log("infos:", infos);
-      
-              activity.assets = {
-                large_image: infos.artworkUrl ?? "appicon",
-                large_text: formatStr(props.album),
-                small_image: "pause_button512",
-              };
-      
-              if (infos.iTunesUrl) {
-                buttons.push({
-                  label: "Play on Apple Music",
-                  url: infos.iTunesUrl,
-                });
-              }
-      
-              const query = encodeURIComponent(
-                `artist:${props.artist} track:${props.name}`
-              );
-              const spotifyUrl = `https://open.spotify.com/search/${query}?si`;
-              if (spotifyUrl.length <= 512) {
-                buttons.push({
-                  label: "Search on Spotify",
-                  url: spotifyUrl,
-                });
-              }
-      
-              if (buttons.length > 0) activity.buttons = buttons;
-            }
-      
-            await rpc.setActivity(activity);
-            return Math.min((delta ?? DEFAULT_TIMEOUT) + 1000, DEFAULT_TIMEOUT);
+
+      // EVERYTHING must be less than or equal to 128 chars long
+      const activity: Activity = {
+        details: formatStr(props.name),
+        timestamps: { end },
+        assets: { large_image: "appicon" },
+      };
+
+      if (props.artist.length > 0) {
+        activity.state = formatStr(`by ${props.artist}`);
+      }
+
+      // album.length == 0 for radios
+      if (props.album.length > 0) {
+        const buttons = [];
+
+        const infos = await getTrackExtras(props);
+        console.log("infos:", infos);
+
+        activity.assets = {
+          large_image: infos.artworkUrl ?? "appicon",
+          large_text: formatStr(props.album),
+          small_image: "pause_button512",
+        };
+
+        if (infos.iTunesUrl) {
+          buttons.push({
+            label: "Play on Apple Music",
+            url: infos.iTunesUrl,
+          });
+        }
+
+        const query = encodeURIComponent(
+          `artist:${props.artist} track:${props.name}`
+        );
+        const spotifyUrl = `https://open.spotify.com/search/${query}?si`;
+        if (spotifyUrl.length <= 512) {
+          buttons.push({
+            label: "Search on Spotify",
+            url: spotifyUrl,
+          });
+        }
+
+        if (buttons.length > 0) activity.buttons = buttons;
+      }
+
+      await rpc.setActivity(activity);
+      return Math.min((delta ?? DEFAULT_TIMEOUT) + 1000, DEFAULT_TIMEOUT);
     }
     case "stopped": {
       await rpc.clearActivity();
